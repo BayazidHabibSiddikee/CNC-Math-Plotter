@@ -3,11 +3,11 @@ from telebot import types
 import new  # Your file containing the Draw class
 
 # --- CONFIGURATION ---
-API = "8690254124:AAG4hFS89yHbsEcNT3Wsfoa6io1jlVUAGgI"
+API = "Your TELEGRAM bot token"
 bot = telebot.TeleBot(token=API)
 
 # Add authorized Telegram IDs here (Get yours from @userinfobot)
-ALLOWED_USERS = [8058658801] # my real tele id -_-
+ALLOWED_USERS = [12345342,142544332] # Use your and your friends id
 
 # --- SECURITY CHECK ---
 def is_authorized(message):
