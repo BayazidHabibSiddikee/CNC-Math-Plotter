@@ -7,7 +7,7 @@ import ollama
 import json
 
 # --- CONFIGURATION ---
-API = "8690254124:AAG4hFS89yHbsEcNT3Wsfoa6io1jlVUAGgI"
+API = "Telegram API key"
 bot = telebot.TeleBot(token=API)
 OLLAMA_MODEL = "tinyllama"
 
