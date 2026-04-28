@@ -1,4 +1,4 @@
-API = "8690254124:AAG4hFS89yHbsEcNT3Wsfoa6io1jlVUAGgI" #API key for tel bot
+API = "Your API key" #API key for tel bot
 
 import telebot
 bot = telebot.TeleBot(token=API)
