@@ -7,7 +7,7 @@ import ollama
 import json
 
 # --- CONFIGURATION ---
-API = "Telegram API key"
+API = "8690254124:AAG4hFS89yHbsEcNT3Wsfoa6io1jlVUAGgI"
 bot = telebot.TeleBot(token=API)
 apihelper.CONNECT_TIMEOUT = 30
 apihelper.READ_TIMEOUT = None  # infinite — drawing can take a while

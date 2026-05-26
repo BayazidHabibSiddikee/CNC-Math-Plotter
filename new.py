@@ -219,28 +219,13 @@ class Draw:
 if __name__=="__main__":
 # Test all curves
     print("Drawing all curves...")
-    '''
-    a = Draw(0, 0, 10)
-
-
-    a.circle()
-    a.heart_curve()
-    a.petal_rose(20)
-    a.lissajous()
-    a.butterfly(8)
-    a.spiral()
-    a.cardioid()
-    a.astroid()
-    a.epitrochoid()
-    a.hypotrochoid()
-    a.rhodonea(petals=7)
-    a.limacon()
-    a.cycloid(5)
-    a.deltoid()
-    a.logarithmic_spiral()'''
-
-
-
-
+    
     a = Draw(0,0,5)
-    a.draw_image(r"/home/bayazid/Pictures/Screenshots/moustache.png")
+    import os
+    test_img = "input_image.jpg"
+    if os.path.exists(test_img):
+        a.draw_image(test_img)
+    else:
+        print(f"Skipping image test: {test_img} not found.")
+        # Draw a simple shape instead
+        a.circle()
