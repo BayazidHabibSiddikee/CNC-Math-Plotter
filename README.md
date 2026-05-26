@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🤖 CNC Virtual Controller & Telegram Bot
 
 A 2-axis CNC math equation plotter with Telegram bot control, image tracing, animated simulation, and C array export.
@@ -121,3 +122,63 @@ See the [Issues](#issues) section below.
 ## 📄 License
 
 MIT License — Free to use, modify, and distribute.
+=======
+# CNC Controller & Simulator
+
+A Python-based CNC path generator and simulator that integrates with Telegram for remote control. It uses NLP (Ollama) and mathematical parsing to convert natural language or equations into CNC toolpaths, which are then exported as C header files for AVR-based CNC machines.
+
+## Features
+
+- **Telegram Bot Integration:** Control your CNC machine via Telegram.
+- **Natural Language Processing:** Use Ollama (Qwen2.5) to parse drawing requests into parametric equations.
+- **Mathematical Parser:** Supports expressions like `y = sin(x)`, `y = x^2`, and complex parametric shapes.
+- **Image Tracing:** Send a photo to the bot to automatically generate simplified CNC paths.
+- **Virtual Simulator:** Visualize the generated paths in a Tkinter-based simulator before running them on hardware.
+- **Consistent AVR Output:** Always exports the current path to `Custom.h` for easy consumption by AVR boards.
+- **Chat History:** Maintains context for conversational interactions and guides users toward CNC commands.
+
+## Setup
+
+1. **Install Dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Configure Ollama:**
+   Ensure Ollama is running locally with the `qwen2.5:0.5b` model (or update `OLLAMA_MODEL` in `main_auto.py`).
+3. **Telegram Bot Token:**
+   Update the `API` token in `main_auto.py` with your bot's token.
+4. **Authorized Users:**
+   Add your Telegram User ID to the `ALLOWED_USERS` list in `main_auto.py`.
+
+## Usage
+
+Run the main bot script:
+```bash
+python main_auto.py
+```
+
+### Commands
+- `/start` or `/help`: Show available commands and instructions.
+- `/demo`: Run a sequence of preset shapes.
+- `/draw x|y|pts...`: Manually specify parametric equations.
+- `/myid`: Get your Telegram User ID.
+
+### Natural Language
+You can also type naturally:
+- "draw a heart"
+- "y = sin(x)"
+- "circle radius 15"
+
+## File Structure
+
+- `main_auto.py`: The entry point for the Telegram bot and NLP parsing.
+- `new.py`: Contains the drawing logic and coordinates the simulator and exporter.
+- `CNC_simulation.py`: The virtual simulator using Tkinter.
+- `create_c_array.py`: Exports toolpaths to C header files (`Custom.h`).
+- `Custom.h`: The output file intended for the AVR board.
+- `chat_history.json`: Stores the last 10 messages for conversational context.
+
+## Hardware Integration
+
+The generated `Custom.h` file contains `path_x`, `path_y`, and `path_z` arrays along with `NUM_POINTS`. Include this file in your AVR project to drive the motors according to the generated coordinates.
+>>>>>>> 82a874b (Refactor: Centralized AVR output to Custom.h, added chat history with CNC guidance, and cleaned up unused scripts/files.)

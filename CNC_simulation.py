@@ -104,12 +104,17 @@ class CNC:
     
     def _update_tool_position(self):
         """Update the red tool marker position"""
-        if self.tool_marker:
-            self.canvas.delete(self.tool_marker)
-        
-        cx, cy = self._to_canvas_coords(self.current_x, self.current_y)
-        self.tool_marker = self.canvas.create_oval(cx-5, cy-5, cx+5, cy+5, 
-                                                   fill='red', outline='darkred', width=2)
+        try:
+            if not self.canvas.winfo_exists():
+                return
+            if self.tool_marker:
+                self.canvas.delete(self.tool_marker)
+            
+            cx, cy = self._to_canvas_coords(self.current_x, self.current_y)
+            self.tool_marker = self.canvas.create_oval(cx-5, cy-5, cx+5, cy+5, 
+                                                       fill='red', outline='darkred', width=2)
+        except tk.TclError:
+            pass
     
     def _distance(self, x1, y1, x2, y2):
         """Calculate distance between two points"""
@@ -117,47 +122,55 @@ class CNC:
     
     def _animate_segment(self, x1, y1, x2, y2, color='blue', width=2):
         """Animate drawing a segment from (x1, y1) to (x2, y2)"""
-        cx1, cy1 = self._to_canvas_coords(x1, y1)
-        cx2, cy2 = self._to_canvas_coords(x2, y2)
-        
-        # Calculate number of steps based on delay or speed
-        if self.draw_delay is not None:
-            num_steps = max(int(self.draw_delay * 60), 10)  # 60 FPS target
-        else:
-            distance = self._distance(x1, y1, x2, y2)
-            time_needed = distance / self.speed
-            num_steps = max(int(time_needed * 60), 10)
-        
-        # Draw line progressively
-        for i in range(num_steps + 1):
-            t = i / num_steps
+        try:
+            if not self.canvas.winfo_exists():
+                return
+            cx1, cy1 = self._to_canvas_coords(x1, y1)
+            cx2, cy2 = self._to_canvas_coords(x2, y2)
             
-            # Current interpolated position
-            curr_x = x1 + t * (x2 - x1)
-            curr_y = y1 + t * (y2 - y1)
+            # Calculate number of steps based on delay or speed
+            if self.draw_delay is not None:
+                num_steps = max(int(self.draw_delay * 60), 10)  # 60 FPS target
+            else:
+                distance = self._distance(x1, y1, x2, y2)
+                time_needed = distance / self.speed
+                num_steps = max(int(time_needed * 60), 10)
             
-            # Update tool position
-            self.current_x = curr_x
-            self.current_y = curr_y
-            self._update_tool_position()
+            # Draw line progressively
+            for i in range(num_steps + 1):
+                if not self.canvas.winfo_exists():
+                    break
+                t = i / num_steps
+                
+                # Current interpolated position
+                curr_x = x1 + t * (x2 - x1)
+                curr_y = y1 + t * (y2 - y1)
+                
+                # Update tool position
+                self.current_x = curr_x
+                self.current_y = curr_y
+                self._update_tool_position()
+                
+                # Draw the line segment up to current position
+                curr_cx = cx1 + t * (cx2 - cx1)
+                curr_cy = cy1 + t * (cy2 - cy1)
+                
+                if i > 0:
+                    prev_cx = cx1 + (i-1)/num_steps * (cx2 - cx1)
+                    prev_cy = cy1 + (i-1)/num_steps * (cy2 - cy1)
+                    self.canvas.create_line(prev_cx, prev_cy, curr_cx, curr_cy, 
+                                          fill=color, width=width)
+                
+                self.canvas.update()
+                time.sleep(self.draw_delay / num_steps if self.draw_delay else 1.0 / 60)
             
-            # Draw the line segment up to current position
-            curr_cx = cx1 + t * (cx2 - cx1)
-            curr_cy = cy1 + t * (cy2 - cy1)
-            
-            if i > 0:
-                prev_cx = cx1 + (i-1)/num_steps * (cx2 - cx1)
-                prev_cy = cy1 + (i-1)/num_steps * (cy2 - cy1)
-                self.canvas.create_line(prev_cx, prev_cy, curr_cx, curr_cy, 
-                                      fill=color, width=width)
-            
-            self.canvas.update()
-            time.sleep(self.draw_delay / num_steps if self.draw_delay else 1.0 / 60)
-        
-        # Ensure final position is exact
-        self.current_x = x2
-        self.current_y = y2
-        self._update_tool_position()
+            # Ensure final position is exact
+            if self.canvas.winfo_exists():
+                self.current_x = x2
+                self.current_y = y2
+                self._update_tool_position()
+        except tk.TclError:
+            pass
     
     def point(self, point_tuple, color='red', size=3):
         """
@@ -268,8 +281,10 @@ class CNC:
             self.speed = speed
         return self
     
-    def show(self):
-        """Display the canvas (blocking)"""
+    def show(self, auto_close=10):
+        """Display the canvas (blocking). Closes after auto_close seconds (default 10)."""
+        if auto_close:
+            self.root.after(int(auto_close * 1000), self.root.destroy)
         self.root.mainloop()
     
     def save(self, filename="cnc_output.ps"):

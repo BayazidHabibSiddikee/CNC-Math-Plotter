@@ -36,7 +36,7 @@ def image_to_cnc_coords(image_path, scale=25):
 
 def solution(xc,yc,t,name="Circle"):
     points = [(xc[i],yc[i]) for i in range(len(t))]
-    array(xc,yc,t,name + ".h")
+    array(xc,yc,t,"Custom.h")
     cnc = CNC(title="Virtual CNC " + name, width=800, height=800, x_range=(-30, 30), y_range=(-30, 30), draw_delay=0.01)
     for i in range(len(points) - 1):
         cnc.segment(points[i], points[i+1], color='blue', width=2)
