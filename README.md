@@ -97,4 +97,4 @@ void executePath() {
 ---
 
 ## 📄 License
-MIT License. Feel free to use, modify, and distribute.
+No MIT License. Feel free to use, modify, and distribute.
