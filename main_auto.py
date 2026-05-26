@@ -7,12 +7,12 @@ import ollama
 import json
 
 # --- CONFIGURATION ---
-API = "8690254124:AAG4hFS89yHbsEcNT3Wsfoa6io1jlVUAGgI"
+API = "Your api key"
 bot = telebot.TeleBot(token=API)
 apihelper.CONNECT_TIMEOUT = 30
 apihelper.READ_TIMEOUT = None  # infinite — drawing can take a while
 OLLAMA_MODEL = "qwen2.5:0.5b"
-ALLOWED_USERS = [8058658801,1667679794]
+ALLOWED_USERS = [your list]
 
 # ── PRESET SHAPES (from mathplot.py) ──────────────────────────────────────────
 # (x_expr, y_expr, t_start, t_end, description)
