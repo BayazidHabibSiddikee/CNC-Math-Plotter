@@ -1,6 +1,7 @@
 # Auto-generated requirements for creating_CNC project
 numpy
-opencv-python
 pyTelegramBotAPI
 ollama
 telebot
+pyserial
+requests

@@ -1,18 +1,91 @@
 import telebot
 from telebot import apihelper
-import new
 import numpy as np
 import re
 import ollama
 import json
+import serial
+import time
+import os
 
-# --- CONFIGURATION ---
-API = "Your api key"
-bot = telebot.TeleBot(token=API)
-apihelper.CONNECT_TIMEOUT = 30
-apihelper.READ_TIMEOUT = None  # infinite — drawing can take a while
-OLLAMA_MODEL = "qwen2.5:0.5b"
-ALLOWED_USERS = [your list]
+# --- HARDWARE CONFIGURATION ---
+# Wheel diameter = 6.7 cm
+# Wheel circumference = pi * 6.7 = 21.05 cm
+# MG996R Speed at 6V (no load) = 0.15s / 60 degrees -> 0.9s / 360 degrees
+# CM per second = 21.05 / 0.9 = 23.39 cm/s
+# MS per CM = 1000 / 23.39 = 42.75 ms/cm
+# User wants 1/16 scaling (extremely small/precise movements)
+SCALE_FACTOR = 1.0 / 16.0 
+LIMIT = 55.0 # Symmetric limit: range is [-55.0, 55.0]
+
+DEFAULT_PORT = os.getenv("CNC_SERIAL_PORT", "/dev/ttyUSB0")
+
+def scale_to_fit(xc, yc, limit=LIMIT):
+    """Ensures coordinates are within [-limit, limit] and apply 1/16 scaling."""
+    xc = np.array(xc, dtype=float)
+    yc = np.array(yc, dtype=float)
+    
+    # 1. Apply the 1/16 scaling factor
+    xc *= SCALE_FACTOR
+    yc *= SCALE_FACTOR
+    
+    # 2. Center the shape at (0, 0)
+    if len(xc) > 0:
+        xc -= (np.max(xc) + np.min(xc)) / 2
+        yc -= (np.max(yc) + np.min(yc)) / 2
+    
+    # 3. Scale down if any point exceeds the [-limit, limit] box
+    curr_ext = max(np.max(np.abs(xc)), np.max(np.abs(yc))) if len(xc) > 0 else 0
+    if curr_ext > limit:
+        ratio = limit / curr_ext
+        xc *= ratio
+        yc *= ratio
+        
+    # 4. Final safety clip
+    xc = np.clip(xc, -limit, limit)
+    yc = np.clip(yc, -limit, limit)
+    
+    return xc, yc
+
+def send_to_cnc(xc, yc, speed=0.2):
+    """Sends coordinates to ESP32 via Serial. Default speed set to 0.2 (very low)."""
+    try:
+        ser = serial.Serial(DEFAULT_PORT, 115200, timeout=1)
+        time.sleep(2) 
+        print(f"Connected to ESP32 on {DEFAULT_PORT}")
+        for i in range(len(xc)):
+            cmd = f"G1 X{xc[i]:.6f} Y{yc[i]:.6f} S{speed:.2f}\n"
+            ser.write(cmd.encode())
+            ser.readline()
+        ser.close()
+        print(f"Transmission complete (Scaled to 1/16, Target Range: +-{LIMIT}cm, Speed: {speed})")
+    except Exception as e:
+        print(f"Serial Error: {e}")
+
+# ... (configuration and bot init)
+
+from CNC_simulation import CNC
+from create_c_array import export_to_c_array as array
+
+def solution(xc, yc, t, name="Circle"):
+    # Apply 1/16 scaling and limit to [-55, 55]
+    xc, yc = scale_to_fit(xc, yc)
+    
+    # Export for C
+    array(xc, yc, t, "Custom.h")
+    
+    # Send to ESP32 (Serial) with very low speed
+    send_to_cnc(xc, yc, speed=0.2)
+    
+    # Virtual Simulator (Showing symmetric range)
+    cnc = CNC(title="Virtual CNC " + name, width=800, height=800, 
+              x_range=(-LIMIT, LIMIT), y_range=(-LIMIT, LIMIT), 
+              draw_delay=0.01)
+    
+    points = list(zip(xc, yc))
+    for i in range(len(points) - 1):
+        cnc.segment(points[i], points[i+1], color='blue', width=2)
+    cnc.show()
 
 # ── PRESET SHAPES (from mathplot.py) ──────────────────────────────────────────
 # (x_expr, y_expr, t_start, t_end, description)
@@ -294,20 +367,18 @@ def send_welcome(message):
     shapes = " | ".join(f"/{k}" for k in PRESETS)
     manual = (
         f"CNC Controller v4.0 — Welcome, {message.from_user.first_name}!\n\n"
-        "Just type naturally — the parser is now much smarter:\n"
+        "Machine Specs: 9cm Board | 6cm Active Zone (0.0 to 6.0)\n"
+        "Scaling: 1/16 Micro-Precision (all values / 16)\n\n"
+        "Just type naturally:\n"
         "  y = sinx          (No parentheses needed)\n"
         "  y = 2x^2 + 3x     (Implicit multiplication works)\n"
-        "  y = (x+1)(x-1)    (Complex groups work)\n"
         "  x^3 - 2x          (Auto-detects y=...)\n"
-        "  x = sin(y)        (Plots on X axis)\n"
-        "  y = logx          (Auto-ranges for log/sqrt)\n\n"
+        "  x = sin(y)        (Plots on X axis)\n\n"
         "Commands:\n"
         "  /demo             - Run ALL shapes in sequence\n"
-        "  /help             - Show this manual\n"
-        "  /draw x|y|pts...  - Manual parametric mode\n\n"
-        "Preset shapes (type the name or use /command):\n"
-        f"  {shapes}\n\n"
-        "Image mode: send any photo to auto-trace it as CNC paths."
+        "  /help             - Show this manual\n\n"
+        "Preset shapes (type name or use /command):\n"
+        f"  {shapes}\n"
     )
     bot.reply_to(message, manual)
 
@@ -347,21 +418,6 @@ def handle_preset_command(message):
     try:
         _render(x_expr, y_expr, t0, t1, 300, r, desc, message.chat.id)
         bot.send_message(message.chat.id, f"{desc} complete.")
-    except Exception as e:
-        bot.reply_to(message, f"Error: {e}")
-
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    if not is_authorized(message): return
-    bot.reply_to(message, "Image received! Converting to CNC paths...")
-    try:
-        file_info = bot.get_file(message.photo[-1].file_id)
-        downloaded_file = bot.download_file(file_info.file_path)
-        with open("input_image.jpg", 'wb') as f:
-            f.write(downloaded_file)
-        worker = new.Draw(0, 0, 15)
-        worker.draw_cartoon("input_image.jpg")
-        bot.send_message(message.chat.id, "Image trace complete!")
     except Exception as e:
         bot.reply_to(message, f"Error: {e}")
 
@@ -433,30 +489,32 @@ bot.set_my_commands([
     telebot.types.BotCommand("logspiral",         "Logarithmic spiral"),
     telebot.types.BotCommand("rainbow",           "Rainbow spiral"),
 ])
-threading.Thread(
-    target=lambda: bot.polling(none_stop=True, timeout=60, long_polling_timeout=60),
-    daemon=True
-).start()
+if __name__ == "__main__":
+    threading.Thread(
+        target=lambda: bot.polling(none_stop=True, timeout=60, long_polling_timeout=60),
+        daemon=True
+    ).start()
 
-# Main thread owns Tkinter — drain draw queue forever
-while True:
-    try:
-        x_expr, y_expr, t_start, t_end, n_points, r, title, chat_id = _draw_queue.get(timeout=1)
+    # Main thread owns Tkinter — drain draw queue forever
+    while True:
         try:
-            t = np.linspace(t_start, t_end, n_points)
-            xc = _eval_expr(x_expr, t, r)
-            yc = _eval_expr(y_expr, t, r)
-            new.solution(xc, yc, t, title)
-            if chat_id:
-                bot.send_message(chat_id, f"Finished drawing: {title}")
+            x_expr, y_expr, t_start, t_end, n_points, r, title, chat_id = _draw_queue.get(timeout=1)
+            try:
+                t = np.linspace(t_start, t_end, n_points)
+                xc = _eval_expr(x_expr, t, r)
+                yc = _eval_expr(y_expr, t, r)
+                solution(xc, yc, t, title)
+                if chat_id:
+                    bot.send_message(chat_id, f"Finished drawing: {title}")
+
+            except Exception as e:
+                print(f"[DRAW ERROR] {e}")
+                if chat_id:
+                    bot.send_message(chat_id, f"Error drawing {title}: {e}")
+        except queue.Empty:
+            pass
+        except KeyboardInterrupt:
+            print("Stopping...")
+            break
         except Exception as e:
-            print(f"[DRAW ERROR] {e}")
-            if chat_id:
-                bot.send_message(chat_id, f"Error drawing {title}: {e}")
-    except queue.Empty:
-        pass
-    except KeyboardInterrupt:
-        print("Stopping...")
-        break
-    except Exception as e:
-        print(f"[MAIN LOOP ERROR] {e}")
+            print(f"[MAIN LOOP ERROR] {e}")

@@ -2,9 +2,9 @@
 import sys, traceback
 sys.path.insert(0, '.')
 
-# Patch out Tkinter rendering
-import new as _new_mod
-_new_mod.solution = lambda xc, yc, t, title: None
+# Patch out Tkinter rendering in main_auto
+import main_auto
+main_auto.solution = lambda xc, yc, t, title: None
 
 from main_auto import try_nlp, _eval_expr, PRESETS
 import numpy as np

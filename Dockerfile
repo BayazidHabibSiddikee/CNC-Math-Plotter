@@ -1,17 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
-# Install system dependencies for Tkinter and OpenCV
+# Install system dependencies for Tkinter and Xvfb (for headless GUI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tk-dev \
     python3-tk \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
-    wget \
+    xvfb \
     curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -29,23 +23,27 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # Copy application files
 COPY . .
 
-# Pre-download the qwen2.5:0.5b model
-RUN ollama pull qwen2.5:0.5b
-
-# Expose necessary ports
-# Telegram bot uses outgoing connections (no port needed)
-# Ollama default port
+# Expose Ollama default port
 EXPOSE 11434
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99
+# Default serial port inside container (user should map this)
+ENV CNC_SERIAL_PORT=/dev/ttyUSB0
 
-# Create a script to start both Ollama and the bot
+# Create a script to start Ollama, Xvfb, and the bot
 RUN echo '#!/bin/bash\n\
+# Start Xvfb for headless Tkinter support\n\
+Xvfb :99 -screen 0 1024x768x16 &\n\
+\n\
 # Start Ollama server in background\n\
 ollama serve &\n\
-sleep 3\n\
+sleep 5\n\
+\n\
+# Ensure model is available\n\
+ollama pull qwen2.5:0.5b\n\
+\n\
 # Start the CNC Controller bot\n\
 python main_auto.py' > /app/start.sh && chmod +x /app/start.sh
 
